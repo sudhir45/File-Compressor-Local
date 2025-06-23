@@ -94,6 +94,11 @@
 
             <!-- This section is hidden until a file is selected -->
             <div id="processing-section" class="hidden space-y-6">
+                <!-- Original Image Preview -->
+                <div id="original-preview-container" class="hidden rounded-lg bg-gray-900/50 p-2">
+                    <img id="original-preview-img" alt="Original image preview" class="max-h-64 w-auto mx-auto rounded-md">
+                </div>
+
                 <!-- 2. File Information -->
                 <div class="info-card rounded-lg p-4">
                     <h3 class="font-semibold text-lg text-white mb-2">Original File</h3>
@@ -128,18 +133,17 @@
                             </div>
                         </div>
                         <div class="flex items-center">
-                            <input id="aspect-ratio" type="checkbox" checked class="h-4 w-4 rounded border-gray-500 text-indigo-600 focus:ring-indigo-500 bg-gray-700">
+                            <!-- MODIFIED: Removed the 'checked' attribute to make it unchecked by default -->
+                            <input id="aspect-ratio" type="checkbox" class="h-4 w-4 rounded border-gray-500 text-indigo-600 focus:ring-indigo-500 bg-gray-700">
                             <label for="aspect-ratio" class="ml-2 block text-sm text-gray-400">Maintain aspect ratio</label>
                         </div>
                         
-                        <!-- NEW: Size vs Quality Control -->
                         <div class="pt-4 border-t border-gray-600 space-y-3">
                             <div class="flex items-center">
                                 <input id="target-size-toggle" type="checkbox" class="h-4 w-4 rounded border-gray-500 text-indigo-600 focus:ring-indigo-500 bg-gray-700">
                                 <label for="target-size-toggle" class="ml-2 block text-sm font-medium text-gray-300">Target Specific Size</label>
                             </div>
                     
-                            <!-- Manual Quality Control -->
                             <div id="quality-control-section" class="space-y-2">
                                 <div class="flex justify-between">
                                     <label for="quality" class="block text-sm font-medium text-gray-400 mb-1">Quality</label>
@@ -148,7 +152,6 @@
                                 <input type="range" id="quality" min="1" max="100" value="75" class="w-full">
                             </div>
 
-                            <!-- Target Size Inputs -->
                             <div id="target-size-inputs" class="hidden space-y-3">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
@@ -163,7 +166,6 @@
                                 <p class="text-xs text-gray-500">Note: Uses an iterative process. Only available for JPEG/WEBP formats.</p>
                             </div>
                         </div>
-
                     </div>
 
                     <!-- General file options (for PDFs, etc.) -->
@@ -180,7 +182,6 @@
                     </div>
                 </div>
                 
-                <!-- 4. Action Button -->
                 <div class="pt-4 border-t border-gray-700">
                      <button id="compress-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
                         Compress File
@@ -190,6 +191,11 @@
 
             <!-- 5. Result Section -->
             <div id="result-section" class="hidden space-y-4">
+                <!-- Compressed Image Preview -->
+                <div id="compressed-preview-container" class="hidden rounded-lg bg-gray-900/50 p-2">
+                    <img id="compressed-preview-img" alt="Compressed image preview" class="max-h-64 w-auto mx-auto rounded-md">
+                </div>
+
                 <div class="info-card rounded-lg p-4">
                      <h3 class="font-semibold text-lg text-white mb-2">Compressed Result</h3>
                      <div class="flex justify-between items-center text-sm">
@@ -232,12 +238,15 @@
         const resultSize = document.getElementById('result-size');
         const errorSection = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
-        // New elements for target size
         const targetSizeToggle = document.getElementById('target-size-toggle');
         const targetSizeInputs = document.getElementById('target-size-inputs');
         const qualityControlSection = document.getElementById('quality-control-section');
         const minSizeInput = document.getElementById('min-size');
         const maxSizeInput = document.getElementById('max-size');
+        const originalPreviewContainer = document.getElementById('original-preview-container');
+        const originalPreviewImg = document.getElementById('original-preview-img');
+        const compressedPreviewContainer = document.getElementById('compressed-preview-container');
+        const compressedPreviewImg = document.getElementById('compressed-preview-img');
 
         // --- State Variables ---
         let currentFile = null;
@@ -298,7 +307,14 @@
             resultSection.classList.add('hidden');
             errorSection.classList.add('hidden');
             
-            // Reset new inputs
+            originalPreviewContainer.classList.add('hidden');
+            originalPreviewImg.src = '';
+            compressedPreviewContainer.classList.add('hidden');
+            if (compressedPreviewImg.src.startsWith('blob:')) {
+                URL.revokeObjectURL(compressedPreviewImg.src);
+            }
+            compressedPreviewImg.src = '';
+
             targetSizeToggle.checked = false;
             targetSizeInputs.classList.add('hidden');
             qualityControlSection.classList.remove('hidden');
@@ -311,23 +327,14 @@
 
         function handleFileSelect(files) {
             if (files.length === 0) return;
-            
-            // FIX: Call resetUI first to clear the state from any previous run.
             resetUI();
-            
-            // Now, assign the new file.
             currentFile = files[0];
-
-            // Update the UI for the new file.
             uploadSection.classList.add('hidden');
             processingSection.classList.remove('hidden');
-
             fileNameEl.textContent = currentFile.name;
             fileSizeEl.textContent = formatBytes(currentFile.size);
-
             imageOptions.classList.add('hidden');
             generalOptions.classList.add('hidden');
-
             if (currentFile.type.startsWith('image/')) {
                 handleImageFile();
             } else {
@@ -339,13 +346,18 @@
             imageOptions.classList.remove('hidden');
             const reader = new FileReader();
             reader.onload = (e) => {
+                const dataUrl = e.target.result;
+                
+                originalPreviewImg.src = dataUrl;
+                originalPreviewContainer.classList.remove('hidden');
+
                 const img = new Image();
                 img.onload = () => {
                     originalImageDimensions = { w: img.width, h: img.height };
                     widthInput.value = img.width;
                     heightInput.value = img.height;
                 };
-                img.src = e.target.result;
+                img.src = dataUrl;
             };
             reader.readAsDataURL(currentFile);
         }
@@ -368,11 +380,9 @@
 
         async function handleCompression() {
             if (!currentFile) return;
-
             compressBtn.disabled = true;
             compressBtn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Compressing...`;
             errorSection.classList.add('hidden');
-
             try {
                 if (currentFile.type.startsWith('image/')) {
                     if (targetSizeToggle.checked) {
@@ -406,7 +416,6 @@
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         const format = formatSelect.value;
                         const quality = parseInt(qualityInput.value, 10) / 100;
-
                         canvas.toBlob((blob) => {
                             if (!blob) return reject(new Error("Canvas toBlob failed"));
                             compressedOutput = { blob, name: `${getFileNameWithoutExtension(currentFile.name)}-compressed.${format.split('/')[1]}` };
@@ -425,23 +434,19 @@
         async function compressImageIteratively() {
             const minBytes = parseFloat(minSizeInput.value) * 1024;
             const maxBytes = parseFloat(maxSizeInput.value) * 1024;
-
             if (isNaN(minBytes) || isNaN(maxBytes) || minBytes <= 0 || maxBytes <= 0 || minBytes > maxBytes) {
                 throw new Error("Invalid min/max size. Please provide positive numbers with max >= min.");
             }
-
             const format = formatSelect.value;
             if (format === 'image/png') {
                 throw new Error("Target size is not applicable for PNG format. Please choose JPEG or WEBP.");
             }
-
             const img = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = e => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = e.target.result; };
                 reader.onerror = reject;
                 reader.readAsDataURL(currentFile);
             });
-
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const newWidth = parseInt(widthInput.value, 10);
@@ -449,49 +454,27 @@
             canvas.width = newWidth > 0 ? newWidth : img.width;
             canvas.height = newHeight > 0 ? newHeight : img.height;
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            let lowerBoundQuality = 1;
-            let upperBoundQuality = 100;
-            let bestBlobInRange = null;
-            let bestBlobUnderMax = null;
-
-            // Binary search for a suitable quality
-            for (let i = 0; i < 8; i++) { // Max 8 iterations to find the quality
+            let lowerBoundQuality = 1, upperBoundQuality = 100, bestBlobInRange = null, bestBlobUnderMax = null;
+            for (let i = 0; i < 8; i++) {
                 let quality = Math.round((lowerBoundQuality + upperBoundQuality) / 2);
-                if (quality < 1) quality = 1;
-                if (quality > 100) quality = 100;
-
+                if (quality < 1) quality = 1; if (quality > 100) quality = 100;
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, format, quality / 100));
                 if (!blob) continue;
-
-                if (blob.size >= minBytes && blob.size <= maxBytes) {
-                    bestBlobInRange = blob;
-                    break; // Perfect match found
-                } else if (blob.size < minBytes) {
-                    lowerBoundQuality = quality + 1;
-                    bestBlobUnderMax = blob; // This is a candidate if we can't get into range
-                } else { // size > maxBytes
-                    upperBoundQuality = quality - 1;
-                }
+                if (blob.size >= minBytes && blob.size <= maxBytes) { bestBlobInRange = blob; break; }
+                else if (blob.size < minBytes) { lowerBoundQuality = quality + 1; bestBlobUnderMax = blob; }
+                else { upperBoundQuality = quality - 1; }
                 if (lowerBoundQuality > upperBoundQuality) break;
             }
-            
             let finalBlob = bestBlobInRange;
             if (!finalBlob) {
-                // If no perfect match, try one last time with the upper quality bound, which should be just under the max size
                 const finalQuality = Math.max(1, upperBoundQuality);
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, format, finalQuality / 100));
-                if(blob && blob.size <= maxBytes) {
-                    finalBlob = blob;
-                } else {
-                    finalBlob = bestBlobUnderMax; // Fallback to the best one we found under the max size
-                }
+                if(blob && blob.size <= maxBytes) { finalBlob = blob; }
+                else { finalBlob = bestBlobUnderMax; }
             }
-
             if (!finalBlob) {
-                throw new Error("Could not compress to the specified size. Try a wider range, different dimensions, or a different format.");
+                throw new Error("Could not compress to the specified size. Try a wider range or different dimensions.");
             }
-
             compressedOutput = { blob: finalBlob, name: `${getFileNameWithoutExtension(currentFile.name)}-compressed.${format.split('/')[1]}` };
             showResult();
         }
@@ -500,9 +483,7 @@
             const zip = new JSZip();
             const compressionLevel = parseInt(document.getElementById('zip-compression').value, 10);
             const options = { compression: "DEFLATE", compressionOptions: { level: compressionLevel } };
-            
             zip.file(currentFile.name, currentFile, options);
-
             return zip.generateAsync({ type: "blob" }).then(function(blob) {
                 compressedOutput = { blob, name: `${getFileNameWithoutExtension(currentFile.name)}.zip` };
                 showResult();
@@ -510,6 +491,12 @@
         }
         
         function showResult() {
+            if (compressedOutput.blob.type.startsWith('image/')) {
+                const previewUrl = URL.createObjectURL(compressedOutput.blob);
+                compressedPreviewImg.src = previewUrl;
+                compressedPreviewContainer.classList.remove('hidden');
+            }
+
             const originalSize = currentFile.size;
             const finalSize = compressedOutput.blob.size;
             const reduction = originalSize > 0 ? (1 - finalSize / originalSize) * 100 : 0;
